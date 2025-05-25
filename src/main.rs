@@ -1,7 +1,6 @@
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, Responder};
-use connections::postgres;
+use connections::postgres::Db;
 use dotenv::dotenv;
-use sqlx::{Pool, Postgres};
 use std::io;
 
 use config::Config;
@@ -10,7 +9,7 @@ mod config;
 mod connections;
 mod logs;
 
-async fn healthchecker(_pool: web::Data<Pool<Postgres>>) -> impl Responder {
+async fn healthchecker() -> impl Responder {
     const MESSAGE: &str = "Complete RUST API";
 
     HttpResponse::Ok().json(serde_json::json!({
@@ -27,13 +26,15 @@ async fn main() -> io::Result<()> {
     let config = Config::init();
 
     // init database pool
-    let pool = postgres::init_db_pool(&config.database_url).await;
+    let db = Db::new(&config.database_url)
+        .await
+        .expect("Failed to initialize database");
 
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Compress::default())
             .wrap(middleware::Logger::default().log_target("@ => :"))
-            .app_data(web::Data::new(pool.clone()))
+            .app_data(web::Data::new(db.clone()))
             .service(
                 web::scope("/api")
                     .service(web::resource("/healthchecker").route(web::get().to(healthchecker))),
