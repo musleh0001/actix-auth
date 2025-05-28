@@ -1,12 +1,14 @@
 use actix_web::{middleware, web, App, HttpResponse, HttpServer, Responder};
 use connections::postgres::Db;
 use dotenv::dotenv;
+use handler::{create_user, get_all_users};
 use std::io;
 
 use config::Config;
 
 mod config;
 mod connections;
+mod handler;
 mod logs;
 
 async fn healthchecker() -> impl Responder {
@@ -37,7 +39,12 @@ async fn main() -> io::Result<()> {
             .app_data(web::Data::new(db.clone()))
             .service(
                 web::scope("/api")
-                    .service(web::resource("/healthchecker").route(web::get().to(healthchecker))),
+                    .service(web::resource("/healthchecker").route(web::get().to(healthchecker)))
+                    .service(
+                        web::resource("/user")
+                            .route(web::post().to(create_user))
+                            .route(web::get().to(get_all_users)),
+                    ),
             )
     })
     .bind(("127.0.0.1", config.port))?
